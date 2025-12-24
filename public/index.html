@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monnify Payroll System - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .loading {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .status-pending { background-color: #fef3c7; color: #92400e; }
+        .status-processing { background-color: #dbeafe; color: #1e40af; }
+        .status-completed { background-color: #d1fae5; color: #065f46; }
+        .status-failed { background-color: #fee2e2; color: #991b1b; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-white shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                <h1 class="text-3xl font-bold text-gray-900">Monnify Payroll System</h1>
+                <p class="text-gray-600 mt-1">Complete payroll management dashboard</p>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- API Base URL Configuration -->
+            <div class="bg-white rounded-lg shadow p-6 mb-6">
+                <h2 class="text-xl font-semibold mb-4">API Configuration</h2>
+                <div class="flex gap-4 items-end">
+                    <div class="flex-1">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Base URL</label>
+                        <input type="text" id="baseUrl" value="http://localhost:3008" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <button onclick="checkHealth()" 
+                            class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                        Check Health
+                    </button>
+                </div>
+                <div id="healthStatus" class="mt-2"></div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="bg-white rounded-lg shadow mb-6">
+                <div class="border-b border-gray-200">
+                    <nav class="flex -mb-px">
+                        <button onclick="showTab('employees')" id="tab-employees" 
+                                class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-blue-500 text-blue-600">
+                            Employees
+                        </button>
+                        <button onclick="showTab('payrolls')" id="tab-payrolls" 
+                                class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                            Payrolls
+                        </button>
+                        <button onclick="showTab('transactions')" id="tab-transactions" 
+                                class="tab-button px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                            Transactions
+                        </button>
+                    </nav>
+                </div>
+            </div>
+
+            <!-- Employees Tab -->
+            <div id="tab-content-employees" class="tab-content">
+                <div class="bg-white rounded-lg shadow p-6 mb-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold">Employees</h2>
+                        <button onclick="showCreateEmployeeForm()" 
+                                class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+                            + Create Employee
+                        </button>
+                    </div>
+                    <div id="employeesList" class="overflow-x-auto">
+                        <div class="loading"></div> Loading employees...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payrolls Tab -->
+            <div id="tab-content-payrolls" class="tab-content hidden">
+                <div class="bg-white rounded-lg shadow p-6 mb-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold">Payrolls</h2>
+                        <button onclick="showCreatePayrollForm()" 
+                                class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+                            + Create Payroll
+                        </button>
+                    </div>
+                    <div id="payrollsList" class="overflow-x-auto">
+                        <div class="loading"></div> Loading payrolls...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transactions Tab -->
+            <div id="tab-content-transactions" class="tab-content hidden">
+                <div class="bg-white rounded-lg shadow p-6 mb-6">
+                    <h2 class="text-xl font-semibold mb-4">Transaction Status</h2>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Transaction Reference</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="transactionRef" placeholder="Enter transaction reference" 
+                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <button onclick="checkTransactionStatus()" 
+                                    class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                                Check Status
+                            </button>
+                        </div>
+                    </div>
+                    <div id="transactionStatus" class="mt-4"></div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-xl font-semibold mb-4">Account Balance</h2>
+                    <button onclick="getAccountBalance()" 
+                            class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 mb-4">
+                        Get Balance
+                    </button>
+                    <div id="accountBalance" class="mt-4"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <!-- Create Employee Modal -->
+    <div id="createEmployeeModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold">Create Employee</h3>
+                <button onclick="closeModal('createEmployeeModal')" class="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <form id="createEmployeeForm" onsubmit="createEmployee(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                    <input type="text" name="name" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input type="email" name="email" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div class="bg-blue-50 border border-blue-200 rounded-md p-2 text-sm text-blue-700">
+                    <strong>Note:</strong> Employee ID will be auto-generated (e.g., EMP001, EMP002)
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Salary</label>
+                    <input type="number" name="salary" required step="0.01" 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Account Number</label>
+                    <input type="text" name="account_number" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Bank Code</label>
+                    <input type="text" name="bank_code" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Bank Name</label>
+                    <input type="text" name="bank_name" 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div class="flex gap-2">
+                    <button type="submit" class="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+                        Create
+                    </button>
+                    <button type="button" onclick="closeModal('createEmployeeModal')" 
+                            class="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Create Payroll Modal -->
+    <div id="createPayrollModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold">Create Payroll</h3>
+                <button onclick="closeModal('createPayrollModal')" class="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <form id="createPayrollForm" onsubmit="createPayroll(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Payroll Period</label>
+                    <input type="text" name="payroll_period" required placeholder="e.g., 2024-12" 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Employee IDs (optional, comma-separated)</label>
+                    <input type="text" name="employee_ids" placeholder="e.g., 1,2,3 (leave empty for all)" 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div class="flex gap-2">
+                    <button type="submit" class="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+                        Create
+                    </button>
+                    <button type="button" onclick="closeModal('createPayrollModal')" 
+                            class="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3008';
+        let currentTab = 'employees';
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('baseUrl').value = API_BASE;
+            loadEmployees();
+            loadPayrolls();
+        });
+
+        // Tab Management
+        function showTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-button').forEach(el => {
+                el.classList.remove('border-blue-500', 'text-blue-600');
+                el.classList.add('border-transparent', 'text-gray-500');
+            });
+            document.getElementById(`tab-content-${tab}`).classList.remove('hidden');
+            document.getElementById(`tab-${tab}`).classList.add('border-blue-500', 'text-blue-600');
+            document.getElementById(`tab-${tab}`).classList.remove('border-transparent', 'text-gray-500');
+        }
+
+        // Modal Management
+        function showCreateEmployeeForm() {
+            document.getElementById('createEmployeeModal').classList.remove('hidden');
+        }
+
+        function showCreatePayrollForm() {
+            document.getElementById('createPayrollModal').classList.remove('hidden');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        }
+
+        // API Helper
+        async function apiCall(endpoint, method = 'GET', body = null) {
+            const baseUrl = document.getElementById('baseUrl').value || API_BASE;
+            const options = {
+                method,
+                headers: { 'Content-Type': 'application/json' }
+            };
+            if (body) options.body = JSON.stringify(body);
+            
+            try {
+                const response = await fetch(`${baseUrl}${endpoint}`, options);
+                const data = await response.json();
+                return { ok: response.ok, data, status: response.status };
+            } catch (error) {
+                return { ok: false, error: error.message };
+            }
+        }
+
+        // Health Check
+        async function checkHealth() {
+            const baseUrl = document.getElementById('baseUrl').value || API_BASE;
+            const result = await apiCall('/health');
+            const statusDiv = document.getElementById('healthStatus');
+            if (result.ok && result.data.status === 'healthy') {
+                statusDiv.innerHTML = '<div class="text-green-600 font-medium">✓ Server is healthy and database is connected</div>';
+            } else {
+                statusDiv.innerHTML = '<div class="text-red-600 font-medium">✗ Server is unhealthy</div>';
+            }
+        }
+
+        // Employee Operations
+        async function loadEmployees() {
+            const result = await apiCall('/api/employees');
+            const container = document.getElementById('employeesList');
+            
+            if (!result.ok) {
+                container.innerHTML = `<div class="text-red-600">Error: ${result.error || result.data?.error}</div>`;
+                return;
+            }
+
+            const employees = result.data.data || [];
+            if (employees.length === 0) {
+                container.innerHTML = '<div class="text-gray-500">No employees found. Create one to get started.</div>';
+                return;
+            }
+
+            container.innerHTML = `
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee ID</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salary</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bank</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        ${employees.map(emp => `
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${emp.id}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${emp.name}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${emp.email}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${emp.employee_id}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₦${parseFloat(emp.salary).toLocaleString()}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${emp.bank_name || 'N/A'}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                    <button onclick="deleteEmployee(${emp.id})" 
+                                            class="text-red-600 hover:text-red-900">Delete</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        async function createEmployee(event) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            const data = {
+                name: formData.get('name'),
+                email: formData.get('email'),
+                // employee_id is now auto-generated - no need to include it
+                salary: parseFloat(formData.get('salary')),
+                account_number: formData.get('account_number'),
+                bank_code: formData.get('bank_code'),
+                bank_name: formData.get('bank_name')
+            };
+
+            const result = await apiCall('/api/employees', 'POST', data);
+            if (result.ok) {
+                alert('Employee created successfully!');
+                closeModal('createEmployeeModal');
+                event.target.reset();
+                loadEmployees();
+            } else {
+                alert(`Error: ${result.data?.error || result.error}`);
+            }
+        }
+
+        async function deleteEmployee(id) {
+            if (!confirm('Are you sure you want to delete this employee?')) return;
+            const result = await apiCall(`/api/employees/${id}`, 'DELETE');
+            if (result.ok) {
+                alert('Employee deleted successfully!');
+                loadEmployees();
+            } else {
+                alert(`Error: ${result.data?.error || result.error}`);
+            }
+        }
+
+        // Payroll Operations
+        async function loadPayrolls() {
+            const result = await apiCall('/api/payrolls');
+            const container = document.getElementById('payrollsList');
+            
+            if (!result.ok) {
+                container.innerHTML = `<div class="text-red-600">Error: ${result.error || result.data?.error}</div>`;
+                return;
+            }
+
+            const payrolls = result.data.data || [];
+            if (payrolls.length === 0) {
+                container.innerHTML = '<div class="text-gray-500">No payrolls found. Create one to get started.</div>';
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="space-y-4">
+                    ${payrolls.map(payroll => `
+                        <div class="border border-gray-200 rounded-lg p-4">
+                            <div class="flex justify-between items-start mb-3">
+                                <div>
+                                    <h3 class="text-lg font-semibold">Payroll #${payroll.id}</h3>
+                                    <p class="text-sm text-gray-600">Period: ${payroll.payroll_period}</p>
+                                    <p class="text-sm text-gray-600">Total: ₦${parseFloat(payroll.total_amount).toLocaleString()} | Employees: ${payroll.total_employees}</p>
+                                </div>
+                                <span class="status-badge status-${payroll.status}">${payroll.status}</span>
+                            </div>
+                            <div class="flex gap-2 mt-3">
+                                <button onclick="viewPayrollDetails(${payroll.id})" 
+                                        class="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
+                                    View Details
+                                </button>
+                                ${payroll.status === 'pending' ? `
+                                    <button onclick="processPayroll(${payroll.id})" 
+                                            class="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700">
+                                        Process Payroll
+                                    </button>
+                                ` : ''}
+                                ${payroll.status === 'processing' || payroll.status === 'partially_completed' ? `
+                                    <button onclick="checkPayrollStatus(${payroll.id})" 
+                                            class="px-3 py-1 bg-yellow-600 text-white text-sm rounded hover:bg-yellow-700">
+                                        Check Status
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        async function createPayroll(event) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            const data = {
+                payroll_period: formData.get('payroll_period')
+            };
+            
+            const employeeIds = formData.get('employee_ids');
+            if (employeeIds && employeeIds.trim()) {
+                data.employee_ids = employeeIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+            }
+
+            const result = await apiCall('/api/payrolls', 'POST', data);
+            if (result.ok) {
+                alert('Payroll created successfully!');
+                closeModal('createPayrollModal');
+                event.target.reset();
+                loadPayrolls();
+            } else {
+                alert(`Error: ${result.data?.error || result.error}`);
+            }
+        }
+
+        async function processPayroll(id) {
+            if (!confirm('Start processing this payroll? This will initiate payments via Monnify.')) return;
+            const result = await apiCall(`/api/payrolls/${id}/process`, 'POST', { use_bulk: true });
+            if (result.ok) {
+                alert('Payroll processing started! Check status to monitor progress.');
+                loadPayrolls();
+            } else {
+                alert(`Error: ${result.data?.error || result.error}`);
+            }
+        }
+
+        async function viewPayrollDetails(id) {
+            const result = await apiCall(`/api/payrolls/${id}`);
+            if (!result.ok) {
+                alert(`Error: ${result.data?.error || result.error}`);
+                return;
+            }
+
+            const payroll = result.data.data;
+            const items = payroll.items || [];
+            
+            const detailsHtml = `
+                <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto z-50">
+                    <div class="relative top-10 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-semibold">Payroll #${payroll.id} Details</h3>
+                            <button onclick="closeModal('payrollDetailsModal')" class="text-gray-400 hover:text-gray-600">✕</button>
+                        </div>
+                        <div class="mb-4">
+                            <p><strong>Period:</strong> ${payroll.payroll_period}</p>
+                            <p><strong>Total Amount:</strong> ₦${parseFloat(payroll.total_amount).toLocaleString()}</p>
+                            <p><strong>Status:</strong> <span class="status-badge status-${payroll.status}">${payroll.status}</span></p>
+                            <p><strong>Processed:</strong> ${payroll.processed_count || 0} | <strong>Failed:</strong> ${payroll.failed_count || 0}</p>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Transaction Ref</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    ${items.map(item => `
+                                        <tr>
+                                            <td class="px-4 py-2 text-sm">${item.employee_name} (${item.employee_identifier})</td>
+                                            <td class="px-4 py-2 text-sm">₦${parseFloat(item.amount).toLocaleString()}</td>
+                                            <td class="px-4 py-2 text-sm">
+                                                <span class="status-badge status-${item.status}">${item.status}</span>
+                                            </td>
+                                            <td class="px-4 py-2 text-sm text-xs font-mono">${item.transaction_reference || 'N/A'}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                        <button onclick="closeModal('payrollDetailsModal')" 
+                                class="mt-4 px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            const modal = document.createElement('div');
+            modal.id = 'payrollDetailsModal';
+            modal.innerHTML = detailsHtml;
+            document.body.appendChild(modal);
+        }
+
+        async function checkPayrollStatus(id) {
+            const result = await apiCall(`/api/payrolls/${id}/status`);
+            if (result.ok) {
+                const payroll = result.data.data;
+                const summary = payroll.summary || {};
+                alert(`Status: ${payroll.status}\nCompleted: ${summary.completed || 0}\nFailed: ${summary.failed || 0}\nPending: ${summary.pending || 0}\nProcessing: ${summary.processing || 0}`);
+                loadPayrolls();
+            } else {
+                alert(`Error: ${result.data?.error || result.error}`);
+            }
+        }
+
+        // Transaction Operations
+        async function checkTransactionStatus() {
+            const ref = document.getElementById('transactionRef').value.trim();
+            if (!ref) {
+                alert('Please enter a transaction reference');
+                return;
+            }
+
+            const result = await apiCall(`/api/payrolls/transaction/${ref}/status`);
+            const container = document.getElementById('transactionStatus');
+            
+            if (!result.ok) {
+                container.innerHTML = `<div class="text-red-600">Error: ${result.data?.error || result.error}</div>`;
+                return;
+            }
+
+            const transaction = result.data.data;
+            container.innerHTML = `
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <h3 class="font-semibold mb-2">Transaction Details</h3>
+                    <div class="space-y-1 text-sm">
+                        <p><strong>Reference:</strong> ${transaction.reference || 'N/A'}</p>
+                        <p><strong>Status:</strong> ${transaction.status || 'N/A'}</p>
+                        <p><strong>Amount:</strong> ₦${transaction.amount ? parseFloat(transaction.amount).toLocaleString() : 'N/A'}</p>
+                        <p><strong>Currency:</strong> ${transaction.currency || 'N/A'}</p>
+                        <p><strong>Destination Account:</strong> ${transaction.destinationAccountNumber || 'N/A'}</p>
+                        <p><strong>Bank:</strong> ${transaction.destinationBankName || 'N/A'}</p>
+                        <p><strong>Date:</strong> ${transaction.transactionDate || 'N/A'}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function getAccountBalance() {
+            const result = await apiCall('/api/payrolls/account/balance');
+            const container = document.getElementById('accountBalance');
+            
+            if (!result.ok) {
+                container.innerHTML = `<div class="text-red-600">Error: ${result.data?.error || result.error}</div>`;
+                return;
+            }
+
+            const balance = result.data.data;
+            container.innerHTML = `
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <h3 class="font-semibold mb-2">Account Balance</h3>
+                    <div class="space-y-1 text-sm">
+                        <p><strong>Available Balance:</strong> ₦${balance.availableBalance ? parseFloat(balance.availableBalance).toLocaleString() : 'N/A'}</p>
+                        <p><strong>Ledger Balance:</strong> ₦${balance.ledgerBalance ? parseFloat(balance.ledgerBalance).toLocaleString() : 'N/A'}</p>
+                        <p><strong>Currency:</strong> ${balance.currency || 'N/A'}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Auto-refresh for processing payrolls
+        setInterval(() => {
+            if (currentTab === 'payrolls') {
+                loadPayrolls();
+            }
+        }, 5000); // Refresh every 5 seconds
+    </script>
+</body>
+</html>
+

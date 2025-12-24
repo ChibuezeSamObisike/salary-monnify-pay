@@ -1,0 +1,379 @@
+### Monnify Payroll API Test File
+### Use with REST Client extension in VS Code or similar tools
+### Base URL - Update if your server runs on a different port
+@baseUrl = http://localhost:3008
+
+### Variables - Update these after creating resources
+@employeeId1 = 1
+@employeeId2 = 2
+@payrollId = 1
+@transactionReference = YOUR_TRANSACTION_REFERENCE_HERE
+
+###############################################
+# HEALTH CHECK
+###############################################
+
+### Health Check
+GET {{baseUrl}}/health
+
+###############################################
+# EMPLOYEE ENDPOINTS
+###############################################
+
+### Create Employee 1
+POST {{baseUrl}}/api/employees
+Content-Type: application/json
+
+{
+  "name": "John Doe",
+  "email": "john.doe@example.com",
+  "employee_id": "EMP0015x",
+  "salary": 50000,
+  "account_number": "0123456789",
+  "bank_code": "058",
+  "bank_name": "Guaranty Trust Bank"
+}
+
+### Create Employee 2
+POST {{baseUrl}}/api/employees
+Content-Type: application/json
+
+{
+  "name": "Jane Smith",
+  "email": "jane.smith@example.com",
+  "employee_id": "EMP002",
+  "salary": 75000,
+  "account_number": "9876543210",
+  "bank_code": "011",
+  "bank_name": "First Bank of Nigeria"
+}
+
+### Create Employee 3
+POST {{baseUrl}}/api/employees
+Content-Type: application/json
+
+{
+  "name": "Michael Johnson",
+  "email": "michael.johnson@example.com",
+  "employee_id": "EMP003",
+  "salary": 60000,
+  "account_number": "5555555555",
+  "bank_code": "050",
+  "bank_name": "Ecobank Nigeria"
+}
+
+### Get All Employees
+GET {{baseUrl}}/api/employees
+
+### Get Employee by ID (Update @employeeId1 variable)
+GET {{baseUrl}}/api/employees/{{employeeId1}}
+
+### Update Employee (Update @employeeId1 variable)
+PUT {{baseUrl}}/api/employees/{{employeeId1}}
+Content-Type: application/json
+
+{
+  "name": "John Doe Updated",
+  "salary": 55000,
+  "account_number": "0123456789",
+  "bank_code": "058"
+}
+
+### Delete Employee (Soft Delete - Update @employeeId1 variable)
+DELETE {{baseUrl}}/api/employees/{{employeeId1}}
+
+###############################################
+# PAYROLL ENDPOINTS
+###############################################
+
+### Create Payroll - All Active Employees
+POST {{baseUrl}}/api/payrolls
+Content-Type: application/json
+
+{
+  "payroll_period": "2024-12"
+}
+
+### Create Payroll - Specific Employees (Update employee IDs)
+POST {{baseUrl}}/api/payrolls
+Content-Type: application/json
+
+{
+  "payroll_period": "2024-12",
+  "employee_ids": [1, 2, 3]
+}
+
+### Get All Payrolls
+GET {{baseUrl}}/api/payrolls
+
+### Get Payroll by ID with Items (Update @payrollId variable)
+GET {{baseUrl}}/api/payrolls/{{payrollId}}
+
+### Get Payroll Status with Summary (Update @payrollId variable)
+GET {{baseUrl}}/api/payrolls/{{payrollId}}/status
+
+### Process Payroll - Start Background Job (Update @payrollId variable)
+### ⚠️ IMPORTANT: This endpoint MUST be called to start processing!
+### After creating a payroll, it will have status "pending" until you call this.
+### This will queue background jobs to process payments via Monnify.
+POST {{baseUrl}}/api/payrolls/{{payrollId}}/process
+Content-Type: application/json
+
+{
+  "batch_size": 5
+}
+
+### Process Payroll - Default Batch Size (Update @payrollId variable)
+POST {{baseUrl}}/api/payrolls/{{payrollId}}/process
+Content-Type: application/json
+
+{}
+
+###############################################
+# TRANSACTION & ACCOUNT ENDPOINTS
+###############################################
+
+### How to Get Transaction References:
+### 
+### Method 1: From Payroll Details Response
+### 1. Call GET /api/payrolls/{id} to get payroll with all items
+### 2. Look for the "items" array in the response
+### 3. Each item with status "completed" will have a "transaction_reference" field
+### 
+### Example Response Structure:
+### {
+###   "data": {
+###     "id": 1,
+###     "payroll_period": "2024-12",
+###     "total_amount": 50000,
+###     "status": "completed",
+###     "items": [
+###       {
+###         "id": 1,
+###         "payroll_id": 1,
+###         "employee_id": 1,
+###         "employee_name": "John Doe",
+###         "amount": 50000,
+###         "status": "completed",
+###         "transaction_reference": "MNFY202412091234567890",  <-- COPY THIS!
+###         "processed_at": "2024-12-09T13:20:00.000Z"
+###       },
+###       {
+###         "id": 2,
+###         "employee_id": 2,
+###         "employee_name": "Jane Smith",
+###         "amount": 75000,
+###         "status": "completed",
+###         "transaction_reference": "MNFY202412091234567891",  <-- OR THIS!
+###         "processed_at": "2024-12-09T13:20:05.000Z"
+###       }
+###     ]
+###   }
+### }
+### 
+### Method 2: From Payroll Status Response
+### GET /api/payrolls/{id}/status also returns items with transaction_reference
+###
+### Note: Only items with status "completed" will have a transaction_reference.
+### Items with status "pending", "processing", or "failed" won't have one yet.
+
+### Get Payroll with Items (to extract transaction references)
+GET {{baseUrl}}/api/payrolls/{{payrollId}}
+
+### Check Transaction Status (Update @transactionReference variable with value from payroll items)
+GET {{baseUrl}}/api/payrolls/transaction/{{transactionReference}}/status
+
+### Get Monnify Account Balance
+GET {{baseUrl}}/api/payrolls/account/balance
+
+### Authorize Bulk Transfer with OTP
+### ⚠️ IMPORTANT: After initiating a bulk transfer, you MUST authorize it with an OTP
+### 1. Initiate bulk transfer via POST /api/payrolls/{id}/process
+### 2. Check your registered email for the OTP from Monnify
+### 3. Use the batch reference from the response and the OTP to authorize
+### Optional: Include payrollId to trigger automatic reconciliation after authorization
+### Update @batchReference and @otp variables below
+POST {{baseUrl}}/api/payrolls/batch/authorize
+Content-Type: application/json
+
+{
+  "reference": "BATCH_1702456789123",
+  "authorizationCode": "491763",
+  "payrollId": 1
+}
+
+### Reconcile Payroll (Sync with Monnify Transaction Status)
+### ⚠️ IMPORTANT: Use this to sync your database with actual Monnify transaction status
+### When to use:
+### - After authorizing a bulk transfer (to check final status)
+### - When transactions seem stuck in "processing" status
+### - Periodically to ensure database is in sync
+### - After webhook failures
+### This will:
+### 1. Check each transaction's status with Monnify
+### 2. Update item status (PAID → completed, FAILED → failed)
+### 3. Update payroll statistics
+POST {{baseUrl}}/api/payrolls/{{payrollId}}/reconcile
+
+###############################################
+# FULL PAYMENT FLOW - STEP BY STEP
+###############################################
+
+### Step 1: Health Check
+GET {{baseUrl}}/health
+
+### Step 2: Create Employee for Payroll
+POST {{baseUrl}}/api/employees
+Content-Type: application/json
+
+{
+  "name": "Alice Williams",
+  "email": "alice.williams@example.com",
+  "employee_id": "EMP004",
+  "salary": 80000,
+  "account_number": "1111111111",
+  "bank_code": "058",
+  "bank_name": "Guaranty Trust Bank"
+}
+
+### Step 3: Verify Employee Created (Note the ID from response)
+GET {{baseUrl}}/api/employees
+
+### Step 4: Create Payroll for December 2024
+POST {{baseUrl}}/api/payrolls
+Content-Type: application/json
+
+{
+  "payroll_period": "2024-12"
+}
+
+### Step 5: Get Payroll Details (Note the payroll ID from Step 4 response)
+### IMPORTANT: At this point, status will be "pending" - this is normal!
+GET {{baseUrl}}/api/payrolls/1
+
+### Step 6: Start Processing Payroll (REQUIRED - Use payroll ID from Step 4)
+### ⚠️ IMPORTANT: You MUST call this endpoint to start processing!
+### Without this, the payroll will remain "pending" forever.
+### This will:
+### 1. Change payroll status to "processing"
+### 2. Initiate bulk transfer via Monnify batch API
+### 3. Returns a batchReference that you'll need for authorization
+POST {{baseUrl}}/api/payrolls/1/process
+Content-Type: application/json
+
+{
+  "batch_size": 5
+}
+
+### Step 6.5: Authorize Bulk Transfer with OTP (REQUIRED)
+### ⚠️ CRITICAL: After Step 6, check your registered email for OTP from Monnify
+### 1. Get the batchReference from Step 6 response (or check logs)
+### 2. Check your email for the OTP (usually 6 digits)
+### 3. Use this endpoint to authorize the bulk transfer
+### 4. Optional: Include payrollId to trigger automatic reconciliation
+### Without authorization, the transfer will not be processed!
+POST {{baseUrl}}/api/payrolls/batch/authorize
+Content-Type: application/json
+
+{
+  "reference": "BATCH_1702456789123",
+  "authorizationCode": "491763",
+  "payrollId": 1
+}
+
+### Step 6.6: Reconcile Payroll (OPTIONAL but RECOMMENDED)
+### Sync your database with actual Monnify transaction status
+### Use this if you didn't include payrollId in Step 6.5, or to re-check status
+POST {{baseUrl}}/api/payrolls/1/reconcile
+
+### Step 7: Check Payroll Status (Poll this endpoint to monitor progress)
+GET {{baseUrl}}/api/payrolls/1/status
+
+### Step 8: Get Payroll Details with Items (Check transaction references)
+### The response will contain an "items" array. Each completed item has a "transaction_reference"
+### Example: Look for "transaction_reference": "MNFY202412091234567890" in the items array
+GET {{baseUrl}}/api/payrolls/1
+
+### Step 9: Check Specific Transaction Status
+### Copy the transaction_reference from Step 8 response and use it here
+### Example: If transaction_reference is "MNFY202412091234567890", use:
+### GET {{baseUrl}}/api/payrolls/transaction/MNFY202412091234567890/status
+GET {{baseUrl}}/api/payrolls/transaction/YOUR_TRANSACTION_REFERENCE/status
+
+### Step 10: Check Account Balance
+GET {{baseUrl}}/api/payrolls/account/balance
+
+###############################################
+# TEST SCENARIOS
+###############################################
+
+### Test: Create Employee with Duplicate Email (Should Fail)
+POST {{baseUrl}}/api/employees
+Content-Type: application/json
+
+{
+  "name": "Duplicate Email",
+  "email": "john.doe@example.com",
+  "employee_id": "EMP999",
+  "salary": 40000,
+  "account_number": "9999999999",
+  "bank_code": "058",
+  "bank_name": "Guaranty Trust Bank"
+}
+
+### Test: Create Employee with Duplicate Employee ID (Should Fail)
+POST {{baseUrl}}/api/employees
+Content-Type: application/json
+
+{
+  "name": "Duplicate Employee ID",
+  "email": "duplicate@example.com",
+  "employee_id": "EMP001",
+  "salary": 40000,
+  "account_number": "8888888888",
+  "bank_code": "058",
+  "bank_name": "Guaranty Trust Bank"
+}
+
+### Test: Create Payroll without Payroll Period (Should Fail)
+POST {{baseUrl}}/api/payrolls
+Content-Type: application/json
+
+{
+  "employee_ids": [1, 2]
+}
+
+### Test: Get Non-existent Employee (Should Return 404)
+GET {{baseUrl}}/api/employees/99999
+
+### Test: Get Non-existent Payroll (Should Return 404)
+GET {{baseUrl}}/api/payrolls/99999
+
+### Test: Process Already Completed Payroll (Should Fail)
+POST {{baseUrl}}/api/payrolls/1/process
+Content-Type: application/json
+
+{}
+
+###############################################
+# COMMON NIGERIAN BANK CODES (Reference)
+###############################################
+# 058 - Guaranty Trust Bank (GTB)
+# 011 - First Bank of Nigeria
+# 050 - Ecobank Nigeria
+# 070 - Fidelity Bank
+# 032 - Union Bank of Nigeria
+# 033 - United Bank for Africa (UBA)
+# 035 - Wema Bank
+# 044 - Access Bank
+# 057 - Zenith Bank
+# 214 - First City Monument Bank (FCMB)
+# 215 - Unity Bank
+# 221 - Stanbic IBTC Bank
+# 232 - Sterling Bank
+# 301 - Jaiz Bank
+# 526 - Parallex Bank
+# 566 - Highstreet Microfinance Bank
+# 601 - FSDH Merchant Bank
+# 999 - SystemSpecs (Remita)
+
