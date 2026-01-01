@@ -1,4 +1,4 @@
-# Payroll System with Express, Monnify, and Background Jobs
+# Payroll System with Express, Monnify, and Background Job
 
 A comprehensive payroll management system built with Express.js, TypeScript, PostgreSQL, and Monnify payment integration. The system processes payroll payments asynchronously using background jobs (Bull Queue with Redis).
 
